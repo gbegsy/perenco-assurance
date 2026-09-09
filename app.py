@@ -17,6 +17,106 @@ SITES = [
 
 RESPONSE_OPTIONS = ["", "Yes", "No", "N/A"]
 
+
+# Questions flagged during Yes/No logic review. These are highlighted in red in the
+# prototype because a simple Yes/No response can be reversed, conditional, compound,
+# open-ended, or otherwise misleading for conformance scoring.
+QUESTION_REVIEW_FLAGS = {
+    # Permit Quality
+    "Is the activity planned to be undertaken outside the next 24 hours?": (
+        "Timing is not itself a compliance outcome; a legitimate task may be within 24 hours.",
+        "Has the activity been planned within the required planning timescale and process?"
+    ),
+    "How is the team doing it? Is the method clear?": (
+        "The first part is open-ended, so a Yes/No response does not fit cleanly.",
+        "Is the method for completing the task clearly described and understood?"
+    ),
+    "Does the activity involve breaking of containment on ANY system? And has a thorough hazard identification been conducted to evaluate the associated risks?": (
+        "This combines applicability with compliance. 'No breaking containment' could be acceptable but would score as No.",
+        "Where breaking containment is involved, has a thorough hazard identification been completed and the associated risks adequately controlled? (Use N/A where breaking containment is not involved.)"
+    ),
+    "Has a team consisting of 3 persons (who have suitable knowledge of the task) taken part in the risk assessment? Is the task risk assessment team leader competent (check PCAP profile)?": (
+        "Two separate compliance tests are combined; one could pass and the other fail.",
+        "Split into two scored questions: (1) Has a suitably knowledgeable three-person team completed the assessment? (2) Is the assessment team leader competent for the role?"
+    ),
+    "Is it clear what the hazard is and who/what might be harmed? Is there only one hazard per statement?": (
+        "Two separate checks are combined and could produce a mixed result.",
+        "Split into two scored questions covering hazard/harm clarity and one-hazard-per-statement."
+    ),
+    "Are Control Statements clear on who is doing what and when? Is there enough detail to make it clear but short and concise? Is it clear and simple language?": (
+        "Several separate quality criteria are combined into one Yes/No response.",
+        "Split into clear responsibility/timing and clear/concise language checks."
+    ),
+    "Is the risk reduction credible? Have considerations been made to ensure that for those who have been given numerous actions, the risk of error is not increased?": (
+        "Two different control-effectiveness tests are combined.",
+        "Split credible risk reduction from action-loading/error-risk assessment."
+    ),
+    "Is the WCC free from hazards and controls which do not actively reduce the risk OR are part of standardised measures already in place, i.e. standards / Standard PPE etc.?": (
+        "The negative construction and OR condition make Yes/No interpretation difficult.",
+        "Does the WCC contain only task-relevant hazards and controls that actively reduce risk, excluding standard controls already covered elsewhere?"
+    ),
+
+    # Leadership Engagement
+    "Have any conditions changed since work commenced?": (
+        "A Yes may indicate a problem, while No may be satisfactory; this reverses normal scoring.",
+        "Where conditions have changed since work commenced, has the work been stopped, reassessed and appropriately controlled before continuing? (Use N/A where conditions have not changed.)"
+    ),
+    "Have Major Accident Hazard (MAH) risks been considered where applicable?": (
+        "'Where applicable' makes No ambiguous when no MAH exposure exists.",
+        "Where applicable, have relevant Major Accident Hazard (MAH) risks been identified and appropriately controlled? (Use N/A where no relevant MAH exposure exists.)"
+    ),
+    "Are there any examples of conditions differing from those described in the permit?": (
+        "A Yes indicates potential non-conformance, so the scoring direction is reversed.",
+        "Do the actual worksite conditions match those described in the permit?"
+    ),
+    "Are there any barriers preventing personnel from raising concerns?": (
+        "No is the desired outcome, but the current scoring treats No as a failure.",
+        "Are personnel able to raise concerns or stop the work without barriers?"
+    ),
+    "Are sites identifying gaps in permit quality or compliance through audits? And are they recorded and actioned, tracked to completion?": (
+        "This combines identification, recording, actioning and close-out in one response.",
+        "Split into: (1) Are permit/compliance gaps being identified through audits? (2) Are identified gaps recorded, actioned and tracked to completion?"
+    ),
+
+    # TBT / Permit / POP
+    "TBT Lead (typically the PA) discusses the hazards and controls associated to the task/activity (sourced from the Task Risk Assessment).": (
+        "This is a statement rather than a clear Yes/No question.",
+        "Has the TBT Lead discussed the task hazards and controls identified in the Task Risk Assessment with the work party?"
+    ),
+    "SIMOP activities that may conflict with the activity / task?": (
+        "This is a prompt/fragment rather than a scored compliance question.",
+        "Have relevant SIMOP activities that could conflict with the task been identified, discussed and controlled?"
+    ),
+    "Spills, and potential proximity to open drains discussed and how they can be avoided?": (
+        "This is a fragment and does not clearly define the expected compliant outcome.",
+        "Where relevant, have spill risks and proximity to open drains been discussed and appropriate controls agreed?"
+    ),
+    "Situation awareness, such as potential dropped objects (tools, equipment or structural) discussed and actions taken?": (
+        "This is a fragment and combines discussion with action in one response.",
+        "Have relevant situational hazards, including potential dropped objects, been discussed and appropriate controls implemented?"
+    ),
+    "Isolations, identified checked and discussed?": (
+        "The wording is incomplete and could be interpreted inconsistently.",
+        "Have all required isolations been identified, verified and discussed with the work party?"
+    ),
+    "Emergency response arrangements been discussed and everyone understands what to do?": (
+        "The wording is incomplete and combines two checks.",
+        "Have emergency response arrangements been discussed and can the work party explain what to do in an emergency?"
+    ),
+    "How is the team undertaking each step? Is the method clear?": (
+        "The first part is open-ended, making the Yes/No response unclear.",
+        "Is the method for undertaking each significant task step clear and understood by the work party?"
+    ),
+    "Where there is a Lone Work party, confirm that the PA has completed the TBT with the Area Authority (AA) prior to commencing the task.": (
+        "This is an instruction and only applies to lone work, rather than a universal Yes/No question.",
+        "For lone work, has the PA completed the TBT with the Area Authority before commencing the task? (Use N/A where the task is not lone work.)"
+    ),
+    "Are there any additional hazards transporting tools and equipment to the work site?": (
+        "No may be the desired outcome, but current scoring treats No as a non-conformance.",
+        "Have hazards associated with transporting tools and equipment to the worksite been identified and adequately controlled?"
+    ),
+}
+
 PERMIT_SECTIONS = [
     ("1. Planning", [
         "Is the activity planned to be undertaken outside the next 24 hours?",
@@ -182,7 +282,17 @@ def qkey(prefix: str, idx: int, suffix: str) -> str:
 
 
 def render_question(prefix: str, idx: int, question: str, action_required_on_no: bool = True):
-    st.markdown(f"**{idx}. {question}**")
+    review = QUESTION_REVIEW_FLAGS.get(question)
+    if review:
+        reason, suggestion = review
+        html = f"""<div style='border:2px solid #d32f2f;background:#fff1f1;padding:12px 14px;border-radius:8px;margin:6px 0 8px 0;'>
+        <div style='font-weight:700;color:#b71c1c;font-size:1.02rem;'>⚠ REVIEW REQUIRED — {idx}. {question}</div>
+        <div style='color:#b71c1c;margin-top:6px;'><b>Why flagged:</b> {reason}</div>
+        <div style='color:#7f0000;margin-top:4px;'><b>Suggested wording:</b> {suggestion}</div>
+        </div>"""
+        st.markdown(html, unsafe_allow_html=True)
+    else:
+        st.markdown(f"**{idx}. {question}**")
     c1, c2 = st.columns([1.1, 4])
     response = c1.selectbox("Confirm", RESPONSE_OPTIONS, key=qkey(prefix, idx, "response"), label_visibility="collapsed")
     evidence = c2.text_input("Comments / Evidence", key=qkey(prefix, idx, "evidence"), placeholder="Comments / evidence", label_visibility="collapsed")
@@ -231,6 +341,7 @@ page = st.sidebar.radio("Go to", ["Home", "Permit Quality", "Leadership Engageme
 
 st.title("Control of Work Assurance")
 st.caption("Digital versions of the three supplied assurance checklists. Prototype data remains in the current Streamlit session only.")
+st.markdown("<span style='color:#b71c1c;font-weight:700;'>Red questions are flagged because the Yes/No/N/A response could be reversed, conditional, compound or otherwise confusing for conformance scoring.</span>", unsafe_allow_html=True)
 
 if page == "Home":
     st.subheader("Assurance forms")
